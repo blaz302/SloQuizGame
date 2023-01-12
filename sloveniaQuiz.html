@@ -4,23 +4,7 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js">></script>
 </head>
 <script>
-function pan(dx, dy) {     	
-  transformMatrix[4] += dx;
-  transformMatrix[5] += dy;
-            
-  var newMatrix = "matrix(" +  transformMatrix.join(' ') + ")";
-  matrixGroup.setAttributeNS(null, "transform", newMatrix);
-}
-  function zoom(scale) {
-  for (var i = 0; i < 4; i++) {
-    transformMatrix[i] *= scale;
-  }
-  transformMatrix[4] += (1 - scale) * centerX;
-  transformMatrix[5] += (1 - scale) * centerY;
-		        
-  var newMatrix = "matrix(" +  transformMatrix.join(' ') + ")";
-  matrixGroup.setAttributeNS(null, "transform", newMatrix);
-}
+
 $(document).ready(function(){
   var selectedCountry = "none selected";
   
@@ -30,14 +14,14 @@ $(document).ready(function(){
       myName = $(this).attr("name");
 	}
     var myClass = $(this).attr("id");
-	if($('[id="' + myClass + '"]').attr("fill") != "green"){
-	  $('[fill=red]').removeAttr("fill");
-	  $('[id="' + myClass + '"]').attr("fill","red");
+	if($('[id="' + myClass + '"]').attr("selected") != "true"){
+	  $('[selected=true]').removeAttr("selected");
+	  $('[id="' + myClass + '"]').attr("selected","true");
       $("#displayText").text(myClass + " --- " + myName);
 	  selectedCountry = myClass;
 	}
 	else{ //selecting already green country
-	  $('[fill=red]').removeAttr("fill");
+	  $('[selected=true]').removeAttr("selected");
 	  $("#displayText").text(myClass);
 	  selectedCountry = "none selected";
 	}
@@ -72,6 +56,8 @@ $(document).ready(function(){
 		  $('[id="' + selectedCountry + '"]').attr("name", $("#countryname").val());
 	    }
 	  
+	    $('[selected=true]').removeAttr("selected");
+	    selectedCountry = "none selected";
 	    $("#countryname").val(''); //clear input field
 	  }
     });
@@ -81,6 +67,9 @@ $(document).ready(function(){
 <style>
   path[name] {
     fill: green;
+  }
+  path[selected] {
+    fill: red;
   }
 </style>
 
