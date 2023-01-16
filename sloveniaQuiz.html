@@ -68,14 +68,17 @@ $(document).ready(function(){
   path[name] {
     fill: green;
   }
-  path[selected] {
+  path[selected=true] {
     fill: red;
+  }
+  path[selected=true][name] {
+    fill: yellow
   }
 </style>
 
 <body>
 <div id="header" style="position: fixed;">
-<p id="displayText">Testing</p>
+<p id="displayText">None selected</p>
 <label for="countryname">Selected country:</label>
 <input type="text" id="countryname" name="countryname">
 <hr>
