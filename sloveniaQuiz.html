@@ -11,7 +11,9 @@ window.onbeforeunload = function() {
 $(document).ready(function(){
   var selectedCountry = "none selected";
   
-  $("path").click(function(){
+  var selectedCountryNeighbors = [];
+  
+  /*$("path").click(function(){
 	var myName = "none";
 	if (typeof $(this).attr("name") !== typeof undefined) {
       myName = $(this).attr("name");
@@ -28,51 +30,134 @@ $(document).ready(function(){
 	  $("#displayText").text(myClass);
 	  selectedCountry = "none selected";
 	}
-  });
+  });*/
   
-  /*$('#countryname').keypress(function (e) {
-    if (e.which == 13) { //enter
-      if(selectedCountry == "none selected"){
-	    alert("No country selected");
-	  }
-	  else
-	  {
-	    if(selectedCountry.toLowerCase() == $("#countryname").val().toLowerCase()){
-		  $('[id="' + selectedCountry + '"]').attr("fill","green");
-		  selectedCountry = "none selected";
+  function updateNeigborsColors(){
+	$('[isneighbor=true]').removeAttr("isneighbor");
+	for (let i = 0; i < selectedCountryNeighbors.length; i++) {
+	    $('[id=' + selectedCountryNeighbors[i] + ']').attr("isneighbor", "true");
+	}
+  }
+  
+  $("path").click(function(){
+	if(typeof $(this).attr("id") == typeof undefined){
+		return;
+	}
+	if(selectedCountry == "none selected"){ //we select province for which we wish to select neighbors
+		var myName = "none";
+		if (typeof $(this).attr("name") !== typeof undefined) {
+		myName = $(this).attr("name");
+		}
+		var myClass = $(this).attr("id");
+		$('[selected=true]').removeAttr("selected");
+		$('[id="' + myClass + '"]').attr("selected","true");
+		$("#displayText").text(myClass + " --- " + myName);
+		selectedCountry = myClass;
+		
+		if(typeof $(this).attr("neighbors") !== typeof undefined){
+			selectedCountryNeighbors = $('[id="' + myClass + '"]').attr('neighbors');
+			selectedCountryNeighbors = selectedCountryNeighbors.split(","); //convert string to array with comma as splitter
+			$("#diplayNeighborsText").text("Neighbors: " + selectedCountryNeighbors);
+			updateNeigborsColors();
 		}
 		else{
-		  alert("Wrong!");
+			selectedCountryNeighbors = [];
+			$("#diplayNeighborsText").text("Neighbors: " + $('[id="' + myClass + '"]').attr("neighbors"));
+			updateNeigborsColors();
 		}
-	  }
-	  
-	  $("#countryname").val(''); //clear input field
-    }*/
-	
-	$('#countryname').keypress(function (e) {
-	  if (e.which == 13) { //enter
-        if(selectedCountry == "none selected"){
-	      alert("No country selected");
-	    }
-	    else
-	    {
-		  $('[id="' + selectedCountry + '"]').attr("name", $("#countryname").val());
-		  $('[id="btnSaveSvg"]').removeAttr("disabled"); //svg updated so we can save it
-	    }
-	  
-	    $('[selected=true]').removeAttr("selected");
-	    selectedCountry = "none selected";
-	    $("#countryname").val(''); //clear input field
 		
-		$('[id="progressText"]').text($("path[name]").length + "/" + $("path").length + " (" + ((100 * $("path[name]").length) / $("path").length).toFixed(2) + "%)"); //update progress count
-	  }
-    });
+		$('[id="btnConfirmNeighbors"]').removeAttr("disabled");
+	}
+	else{ //we add (or remove) the province as neighbor to current province
+		if(typeof $(this).attr("id") !== typeof undefined)
+		{
+			var neighborNeighbors = [] //for updating neighbors of province which we are adding or removing as neighbor
+			if(typeof $(this).attr("neighbors") !== typeof undefined){
+				neighborNeighbors = $(this).attr('neighbors');
+				neighborNeighbors = neighborNeighbors.split(","); //convert string to array with comma as splitter
+			}
+			else{
+				neighborNeighbors = [];
+			}
+			
+			if(selectedCountryNeighbors.includes($(this).attr("id"))){ //we are removing this province as neighbor
+				//we remove newly selected province as neighbor to current province
+				var index = selectedCountryNeighbors.indexOf($(this).attr("id"));
+				if (index > -1) {
+					selectedCountryNeighbors.splice(index, 1);
+				}
+				
+				//we remove current province as neighbor in newly selected province
+				var index = neighborNeighbors.indexOf(selectedCountry);
+				if (index > -1) {
+					neighborNeighbors.splice(index, 1);
+				}
+			}
+			else{ //we are adding this province as a neighbor
+				selectedCountryNeighbors.push($(this).attr("id")); //we add newly selected province as neighbor to current province
+				
+				//we add current province as neighbor in newly selected province
+				neighborNeighbors.push(selectedCountry);
+			}
+			
+			
+			if(selectedCountryNeighbors.length == 0){ //this province doesn't have any neighbors
+				$($('[selected=true]').removeAttr("neighbors"));
+			}
+			else{
+				$($('[selected=true]').attr("neighbors", selectedCountryNeighbors));
+			}
+			
+			if(neighborNeighbors.length == 0){ //neighbor province doesn't have any neighbors
+				$('[id=' + $(this).attr("id") + ']').removeAttr("neighbors");
+			}
+			else{
+				$('[id=' + $(this).attr("id") + ']').attr("neighbors", neighborNeighbors);
+			}
+			updateNeigborsColors();
+		}
+	}
+  });
 	
-	$('[id="progressText"]').text($("path[name]").length + "/" + $("path").length + " (" + ((100 * $("path[name]").length) / $("path").length).toFixed(2) + "%)");
+	$('[id="progressText"]').text($("path[confirmed]").length + "/" + $("path[name]").length + " (+ 2) (" + ((100 * $("path[confirmed]").length) / $("path[name]").length).toFixed(2) + "%)");
+	
+	$( "#btnConfirmNeighbors" ).click(function() { //we wish to deselect current settlement
+		$('[selected=true]').attr("confirmed", "true"); //adding mark which confirms this provinces neighbors have been set
+		$('[selected=true]').removeAttr("selected");
+	    $("#displayText").text("None selected");
+	    selectedCountry = "none selected";
+		
+		$('[isneighbor=true]').removeAttr("isneighbor");
+		
+		$('[id="progressText"]').text($("path[confirmed]").length + "/" + $("path[name]").length + " (+ 2) (" + ((100 * $("path[confirmed]").length) / $("path[name]").length).toFixed(2) + "%)");
+	});
+	
+	$(document).on('keypress',function(e) { //when key is pressed
+		if(e.which == 13) { //enter
+			$("#btnConfirmNeighbors").click();
+		}
+	});
 });
 
+/* //one second interval flash code
+var color = "red";
+
+$(function(){
+  setInterval(oneSecondFunction, 1000);
+});
+
+function oneSecondFunction() {
+  $("path[name]").css("fill", color);
+  if(color == "red"){
+    color = "green";
+  }
+  else{
+    color = "red";
+  }
+}
+*/
+
 function saveSvg() {
-  $('[id="btnSaveSvg"]').attr("disabled", ""); //svg saved so we can grey out this button until next update
   const svg = document.querySelector('svg');
   const base64doc = btoa(unescape(encodeURIComponent(svg.outerHTML)));
   const a = document.createElement('a');
@@ -115,11 +200,14 @@ function changeZoomLevel() {
   path[name] {
     fill: green;
   }
-  path[selected=true] {
+  path[confirmed] {
+    fill: blue;
+  }
+  path[isneighbor=true] {
     fill: red;
   }
   path[selected=true][name] {
-    fill: yellow
+    fill: yellow;
   }
   label {
     display: inline-block;
@@ -132,7 +220,8 @@ function changeZoomLevel() {
 
 <body>
 <div id="header" style="position: fixed;">
-  <label id="displayText">None selected</label><button id="btnSaveSvg" onclick="saveSvg()" disabled>Save updated SVG</button><br>
+  <label id="displayText">None selected</label><button id="btnSaveSvg" onclick="saveSvg()">Save updated SVG</button><br>
+  <label id="diplayNeighborsText">Neighbors: []</label></br>
   <div class="slideContainer">
     <input type="range" min="0" max="5" value="0" class="slider" id="zoomSlider" oninput="changeZoomLevel()">
 	<label id="zoomLevelText">100%</label>
@@ -140,6 +229,7 @@ function changeZoomLevel() {
   <label id="progressText">x/x</label>
   <label for="countryname">Selected country:</label>
   <input type="text" id="countryname" name="countryname">
+  <button id="btnConfirmNeighbors" disabled>Confirm neighbors</button>
 <hr>
 </div>
 
