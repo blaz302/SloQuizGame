@@ -1,7 +1,418 @@
 <!DOCTYPE html>
-<html>
+<html id="htmlId">
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="svg-injector.min.js"></script>
+<script src="svg-pan-zoom.min.js"></script>
+<meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<!--
+start with:
+http-server -d <path to folder>
+(otherwise SVG Injector doesn't work because of CORS policy)
+-->
+
+<script>
+
+window.onbeforeunload = function() {
+    return "Leaving site...";
+};
+
+var nrOfGuesses = 0;
+
+$(document).ready(function(){
+
+	var currentPageX = 0;
+	var currentPageY = 0;
+	
+	var currentClientX = 0;
+	var currentClientY = 0;
+
+	if(localStorage.getItem("nrOfGuesses") == null){
+		localStorage.setItem("nrOfGuesses", 0);
+	}
+
+	var saveName = "default.svg";	
+	$("#mapSvg").attr("src", saveName);
+	
+	//elements to inject
+	var mySVGsToInject = document.querySelectorAll('img.inject-me');
+	// Options
+	var injectorOptions = {
+    evalScripts: 'once',
+    pngFallback: 'assets/png',
+    each: function (svg) {
+      //callback after each SVG is injected
+      console.log('SVG injected: ' + svg.getAttribute('id'));
+    }
+	};
+	//do the injection
+	SVGInjector(mySVGsToInject, injectorOptions, function (totalSVGsInjected) {
+		//callback after all SVGs are injected
+		console.log('We injected ' + totalSVGsInjected + ' SVG(s)!');
+		$('[id="progressText"]').text($("path[conquered]").length + "/" + $("path[name]").length + " (" + ((100 * $("path[conquered]").length) / $("path[name]").length).toFixed(2) + "%)");
+		
+		//pan and zoom implementation
+		var svgElement = document.querySelector('svg.inject-me');
+		var panZoom = svgPanZoom(svgElement);
+		
+		//limit panning so a part of the image is always on screen
+		var beforePan;
+        beforePan = function(oldPan, newPan){
+          var stopHorizontal = false
+            , stopVertical = false
+            , gutterWidth = 100
+            , gutterHeight = 100
+              // Computed variables
+            , sizes = this.getSizes()
+            , leftLimit = -((sizes.viewBox.x + sizes.viewBox.width) * sizes.realZoom) + gutterWidth
+            , rightLimit = sizes.width - gutterWidth - (sizes.viewBox.x * sizes.realZoom)
+            , topLimit = -((sizes.viewBox.y + sizes.viewBox.height) * sizes.realZoom) + gutterHeight
+            , bottomLimit = sizes.height - gutterHeight - (sizes.viewBox.y * sizes.realZoom)
+
+          customPan = {}
+          customPan.x = Math.max(leftLimit, Math.min(rightLimit, newPan.x))
+          customPan.y = Math.max(topLimit, Math.min(bottomLimit, newPan.y))
+
+          return customPan
+        }
+		panZoom.setBeforePan(beforePan)
+		
+		//adding null hint to all (already in svg file)
+		/*$('.s').each(function(i) {
+			if(typeof $(this).attr("name") == 'string'){
+				$(this).attr("hint", "none");
+			}
+		});*/
+	});
+
+  var selectedCountry = "none selected";
+  
+  var selectedCountryNeighbors = [];
+  
+  function updateNeigborsColors(){
+	$('[isneighbor=true]').removeAttr("isneighbor");
+	for (let i = 0; i < selectedCountryNeighbors.length; i++) {
+	    $('[id=' + selectedCountryNeighbors[i] + ']').attr("isneighbor", "true");
+	}
+  }
+  
+  const delta = 6;
+  let startX;
+  let startY;
+  
+  var content = document.getElementById('htmlId');
+
+  $(content).on('mousedown', function (event) {
+	startX = event.pageX;
+	startY = event.pageY;
+  });
+  
+  $(document).on('click', 'path', function(event){
+	const diffX = Math.abs(event.pageX - startX);
+    const diffY = Math.abs(event.pageY - startY);
+	
+    if (diffX > delta || diffY > delta) { //we didn't attempt click, but pan
+      return;
+    }
+  
+	if(typeof $(this).attr("id") == typeof undefined){
+		return;
+	}
+
+	var myName = "none";
+	if (typeof $(this).attr("name") !== typeof undefined) {
+	    myName = $(this).attr("name");
+	}
+	var myClass = $(this).attr("id");
+	$('[selected=true]').removeAttr("selected");
+	$('[id="' + myClass + '"]').attr("selected","true");
+	$("#displayText").text(myClass + " --- " + myName);
+	selectedCountry = myClass;
+	
+	if($('[id="' + myClass + '"]').attr("conquered") == "true"){
+		$("#hintText").text("Already guessed: " + $('[id="' + myClass + '"]').attr("name"));
+	}
+	else{
+		$("#hintText").text("Hint: " + $('[id="' + myClass + '"]').attr("hint"));
+	}
+	
+	if(typeof $(this).attr("alternativeNames") !== typeof undefined){
+		altNames = $(this).attr("alternativeNames");
+		altNames = altNames.split(',');
+		$("#displayText").text($("#displayText").text() + " (" + altNames + ")");
+	}
+	
+	if(typeof $(this).attr("neighbors") !== typeof undefined){ //display neighbors
+		selectedCountryNeighbors = $('[id="' + myClass + '"]').attr('neighbors');
+		selectedCountryNeighbors = selectedCountryNeighbors.split(","); //convert string to array with comma as splitter
+		updateNeigborsColors();
+	}
+	else{
+		selectedCountryNeighbors = [];
+		updateNeigborsColors();
+	}
+	
+	if(typeof $(this).attr("population") !== typeof undefined){ //display population text
+		$("#displayPopulationText").text("Population: " + Number($('[id="' + myClass + '"]').attr("population")).toLocaleString("en-US")); <!-- displaying population in a nice way (we have to convert it to Number to use toLocaleString() and add commas) -->
+	}
+	else{
+		$("#displayPopulationText").text("Population: x");
+	}
+  });
+	
+
+	$( "#btnConfirm" ).click(function() {
+		if (selectedCountry == "none selected"){
+			alert("No settlement selected!");
+		}
+		else{
+			if($('#' + selectedCountry).attr('conquered') == "true"){
+				return;
+			}
+			
+			//to lowercase
+			var cleanString1 = $("#countryname").val().toLowerCase();
+			var cleanString2 = $('#' + selectedCountry).attr('name').toLowerCase();
+			
+			//remove dots
+			cleanString1 = cleanString1.replaceAll('.', '');
+			cleanString2 = cleanString2.replaceAll('.', '');
+			
+			//remove hyphens
+			cleanString1 = cleanString1.replaceAll('-', '');
+			cleanString2 = cleanString2.replaceAll('-', '');
+			
+			//remove spaces
+			cleanString1 = cleanString1.replaceAll(' ', '');
+			cleanString2 = cleanString2.replaceAll(' ', '');
+			
+			//replace č,š,ž with c,s,z
+			cleanString1 = cleanString1.replace(/[č]/g, "c");
+			cleanString2 = cleanString2.replace(/[č]/g, "c");
+			cleanString1 = cleanString1.replace(/[š]/g, "s");
+			cleanString2 = cleanString2.replace(/[š]/g, "s");
+			cleanString1 = cleanString1.replace(/[ž]/g, "z");
+			cleanString2 = cleanString2.replace(/[ž]/g, "z");
+			
+			//alert(cleanString1 + " -- " + cleanString2);
+			nrOfGuesses += 1;
+			$('#guessCountText').text("Guesses: " + nrOfGuesses);
+			
+			if(cleanString1 == cleanString2){
+				$('#' + selectedCountry).attr('conquered', "true");
+				
+				$('[isneighbor=true]').each(function(i) {
+					if($(this).attr("hint") == "none"){ //if we have no hint yet, we display the length and special characters (including - del suffix)
+						var name = $(this).attr("name");
+						for (var i = 0; i < name.length; i++) {
+							if(!['.', '-', ' '].includes(name.charAt(i))){
+								name = name.substring(0, i) + '•' + name.substring(i + 1);
+							}
+						}
+						
+						if($(this).attr("name").endsWith("- del")){
+							name = name.substring(0, name.length - 3) + "del";
+						}
+						
+						$(this).attr("hint", name);
+					}
+					else{ //if we already have a hint, we display another character (except the last character)
+						if($(this).attr("hint").replace(/[^•]/g, "").length > 1){
+						
+							var randNum = Math.floor(Math.random() * $(this).attr("hint").replace(/[^•]/g, "").length);
+							
+							var counter = 0;
+							for(i = 0; i < $(this).attr("hint").length; i++){
+								if($(this).attr("hint").charAt(i) == '•'){
+									if(counter == randNum){
+										$(this).attr("hint", $(this).attr("hint").substring(0, i) + $(this).attr("name").charAt(i) + $(this).attr("hint").substring(i + 1));
+										break;
+									}
+									counter += 1;
+								}
+							}
+						}
+					}
+				
+				});
+				
+				$('[selected=true]').removeAttr("selected");
+				$("#displayText").text("None selected");
+				selectedCountry = "none selected";
+				$('[isneighbor=true]').removeAttr("isneighbor");
+				$('#countryname').val("");
+				$('[id="progressText"]').text($("path[conquered]").length + "/" + $("path[name]").length + " (+ 2) (" + ((100 * $("path[conquered]").length) / $("path[name]").length).toFixed(2) + "%)");
+				$('#hintText').text("Hint: none");
+				$('#displayPopulationText').text("Population: x");
+			}
+			else{
+				$("#wrongText").removeAttr("hidden");
+				setTimeout(function() {
+					$("#wrongText").attr("hidden", "hidden");
+				}, 2000);
+			}
+		}
+		
+		/*
+		else{
+			if(!isNaN(parseInt($('#countryname').val()))){ //if we entered a number
+				$('[selected=true]').attr("population", parseInt($('#countryname').val()));
+				$('[selected=true]').removeAttr("selected");
+				$("#displayText").text("None selected");
+				selectedCountry = "none selected";
+				$('[isneighbor=true]').removeAttr("isneighbor");
+				$('#countryname').val("");
+				$('[id="progressText"]').text($("path[population]").length + "/" + $("path[name]").length + " (+ 2) (" + ((100 * $("path[population]").length) / $("path[name]").length).toFixed(2) + "%)");
+			}
+			else{
+				alert("Value is not a number!");
+			}
+		}*/
+	});
+
+	$(document).on('keypress',function(e) { //when key is pressed
+		if(e.which == 13) { //enter
+			$("#btnConfirm").click();
+		}
+	});
+	
+});
+
+/* //one second interval flash code
+var color = "red";
+
+$(function(){
+  setInterval(oneSecondFunction, 1000);
+});
+
+function oneSecondFunction() {
+  $("path[name]").css("fill", color);
+  if(color == "red"){
+    color = "green";
+  }
+  else{
+    color = "red";
+  }
+}
+*/
+
+function saveSvg() {
+	if (confirm("This will overwrite the previous save.")) {
+		svg = document.getElementById("mapSvg");
+		localStorage.setItem("savedMap", svg.innerHTML);
+		localStorage.setItem("nrOfGuesses", nrOfGuesses);
+	}
+	
+	/*
+	const svg = document.querySelector('svg');
+	const base64doc = btoa(unescape(encodeURIComponent(svg.outerHTML)));
+	const a = document.createElement('a');
+	const e = new MouseEvent('click');
+	a.download = 'save.svg';
+	a.href = 'data:image/svg+xml;base64,' + base64doc;
+	a.dispatchEvent(e);
+	*/
+};
+
+function loadSvg() {
+	document.getElementById("mapSvg").innerHTML = localStorage.getItem("savedMap");
+	nrOfGuesses = parseInt(localStorage.getItem("nrOfGuesses"));
+	$('#guessCountText').text("Guesses: " + nrOfGuesses);
+	
+	/*
+	//open file dialog - must be confirmed with button
+	let input = document.createElement('input');
+	input.type = 'file';
+	input.onchange = _ => {
+		let files =   Array.from(input.files);
+		console.log(files[0]);
+	};
+	input.click();
+	*/
+};
+
+function exportSvg(){
+	//TODO
+}
+
+function importSvg(){
+	//TODO
+}
+
+</script>
+
+<style>
+	html, body {
+	  height: 100%;
+	  margin: 0;
+	}
+	path[name] {
+		fill: green;
+	}
+	path[conquered] {
+		fill: blue !important;
+	}
+	path[hint]:not(path[hint="none"]) {
+		fill: #00E600;
+	}
+	path[isneighbor=true] {
+		fill: red;
+	}
+	path[selected=true][name] {
+		fill: yellow !important;
+	}
+	label {
+		display: inline-block;
+		margin: 10px;
+	}
+	.box {
+	  display: flex;
+	  flex-flow: column;
+	  height: 100%;
+	}
+	#mapSvg {
+		width: 100%;
+		height: 100%;
+	}
+	.image-zoom-container{
+		flex: 1;
+	}
+	#footer{
+		text-align: center;
+	}
+</style>
+
 <body>
-<h1>Hello World</h1>
-<p>I'm hosted with GitHub Pages.</p>
+<div class="box">
+	<div id="header" style="background: rgba(0, 0, 255, 0.1); z-index: 1;">
+	  <label id="displayText" style="display: none;">None selected</label> <!-- TODO remove this since you can see it with inspect element -->
+	  <button id="btnSaveSvg" onclick="saveSvg()">Save progress</button><button id="btnLoadSvg" onclick="loadSvg()">Load progress</button>
+	  <button id="btnExportSvg" onclick="exportSvg()">Export save</button><button id="btnImportSvg" onclick="importSvg()">Import save</button>
+	  <label id="guessCountText">Guesses: 0</label>
+	  <label id="hintText">Hint: none</label>
+	  <label id="displayPopulationText">Population: x</label>
+	  <label id="progressText">x/x</label>
+	  <label for="countryname">Guess name:</label>
+	  <input type="text" id="countryname" name="countryname">
+	  <button id="btnConfirm">Confirm</button>
+	  <p id="wrongText" hidden>Wrong!</p>
+	<hr>
+	</div>
+
+	<!-- Na zemljevidu manjkata naselji Sveta Ana pri Ložu in Zatrnik. Spodnji Brnik je večji, kot bi moral biti, Zgornji Brnik pa manjši -->
+	<div id="map" class="image-zoom-container">
+
+	<img id="mapSvg" class="inject-me mapImage">
+
+	</div>
+	
+	<div id="footer">
+		<p>Slovenia quiz game</p>
+	</div>
+</div>
+
 </body>
 </html>
