@@ -301,8 +301,17 @@ function oneSecondFunction() {
 
 function saveSvg() {
 	if (confirm("This will overwrite the previous save.")) {
-		svg = document.getElementById("mapSvg");
-		localStorage.setItem("savedMap", svg.innerHTML);
+	
+		//select all elements with the attribute "conquered" set to "true"
+		const elements = document.querySelectorAll('[conquered="true"]');
+		//get ids of conquered settlements
+		const ids = Array.from(elements, element => element.id);
+		//select all elements with the attribute hint not equal to none
+		const elements2 = document.querySelectorAll('path:not([hint="none"])[hint]');
+		const hints = Array.from(elements2, element => ({ id: element.id, hint: element.getAttribute('hint') }));
+
+		localStorage.setItem("savedMap", JSON.stringify(ids));
+		localStorage.setItem("savedHints", JSON.stringify(hints));
 		localStorage.setItem("nrOfGuesses", nrOfGuesses);
 	}
 	
@@ -318,9 +327,29 @@ function saveSvg() {
 };
 
 function loadSvg() {
-	document.getElementById("mapSvg").innerHTML = localStorage.getItem("savedMap");
+	// Clear the "conquered" attribute from all elements
+    const allElements = document.querySelectorAll('[conquered]');
+    allElements.forEach(element => element.removeAttribute('conquered'));
+
+	const ids = JSON.parse(localStorage.getItem("savedMap"));
+	ids.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.setAttribute('conquered', 'true');
+      }
+    });
+	
+	const ids2 = JSON.parse(localStorage.getItem("savedHints"));
+	ids2.forEach(info => {
+      const element = document.getElementById(info.id);
+      if (element) {
+        element.setAttribute('hint', info.hint);
+      }
+    });
+
 	nrOfGuesses = parseInt(localStorage.getItem("nrOfGuesses"));
 	$('#guessCountText').text("Guesses: " + nrOfGuesses);
+	$('[id="progressText"]').text($("path[conquered]").length + "/" + $("path[name]").length + " (" + ((100 * $("path[conquered]").length) / $("path[name]").length).toFixed(2) + "%)");
 	
 	/*
 	//open file dialog - must be confirmed with button
